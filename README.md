@@ -2,7 +2,7 @@
 
 Based on https://github.com/FransVDB/BBox3SagemTool
 
-Command line utility for getting/setting configuration options on Bell Home Hub 3000/2000, Belgacom Box 3 (BBox3), and potentially other routers based on the same generation of Sagemcom platform.
+Command line utility for getting/setting configuration options on Bell Home Hub 3000, Belgacom Box 3 (BBox3), and potentially other routers based on the same generation of Sagemcom platform.
 
 Runs on .net core 2.2.
 
