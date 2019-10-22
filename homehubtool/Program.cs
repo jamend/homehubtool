@@ -100,11 +100,12 @@ Arguments:
 			{
 				if (args.Length < passwordIndex + 2 || string.IsNullOrEmpty(args[passwordIndex + 1]))
 				{
-					Console.WriteLine("Missing argument for --password");
-					return;
+					password = "";
 				}
-
-				password = args[passwordIndex + 1];
+				else
+				{
+					password = args[passwordIndex + 1];
+				}
 			}
 
 			OpenSession(url, username, password);
