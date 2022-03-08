@@ -17,10 +17,13 @@ Arguments:
 --help                  Show this help
 ```
 
-Example:
+## Examples
 
 Dump the device configuration into the `configdump.json` file:
+
 `dotnet run --get Device > configdump.json`
 
+
 Reboot the router after authentication
+
 `dotnet run --url http://192.168.1.1 --username admin --password kbx5xa72 --reboot`
