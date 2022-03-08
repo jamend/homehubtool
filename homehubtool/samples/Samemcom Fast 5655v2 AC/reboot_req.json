@@ -1,0 +1,17 @@
+{
+  "request": {
+    "id": 43,
+    "session-id": 553880316,
+    "priority": false,
+    "actions": [
+      {
+        "id": 0,
+        "method": "reboot",
+        "xpath": "Device",
+        "parameters": { "source": "GUI" }
+      }
+    ],
+    "cnonce": 1520489314,
+    "auth-key": "85d75991158d545c1b65411b970e7cf5"
+  }
+}
