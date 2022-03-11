@@ -14,21 +14,21 @@ using Newtonsoft.Json.Linq;
 
 namespace homehubtool
 {
-	public static class Program
-	{
-		private static Uri _cgiReq;
-		private static string _username;
-		private static string _password;
-		private static string _serverNonce;
-		private static string _localNonce;
-		private static int _sessionID;
-		private static int _requestID;
+    public static class Program
+    {
+        private static Uri _cgiReq;
+        private static string _username;
+        private static string _password;
+        private static string _serverNonce;
+        private static string _localNonce;
+        private static int _sessionID;
+        private static int _requestID;
 
-		static void Main(string[] args)
-		{
-			if (args.Contains("--help") || (!args.Contains("--set") && !args.Contains("--get")))
-			{
-				Console.WriteLine(@"
+        static void Main(string[] args)
+        {
+            if (args.Contains("--help") || (!args.Contains("--set") && !args.Contains("--get") && !args.Contains("--reboot")))
+            {
+                Console.WriteLine(@"
 Arguments:
 --get [xpath]           Retrieve JSON dump of given xpath
 --set [xpath] [value]   Set given xpath to given value
@@ -37,133 +37,164 @@ Arguments:
 --password              Default admin
 --help                  Show this help
 ");
-				return;
-			}
+                return;
+            }
 
-			var getIndex = Array.FindIndex(args, a => a.Equals("--get", StringComparison.CurrentCultureIgnoreCase));
-			var getXpath = "";
-			if (getIndex > -1)
-			{
-				if (args.Length < getIndex + 2 || string.IsNullOrEmpty(args[getIndex + 1]))
-				{
-					Console.WriteLine("Missing argument for --get");
-					return;
-				}
+            var getIndex = Array.FindIndex(args, a => a.Equals("--get", StringComparison.CurrentCultureIgnoreCase));
+            var getXpath = "";
+            if (getIndex > -1)
+            {
+                if (args.Length < getIndex + 2 || string.IsNullOrEmpty(args[getIndex + 1]))
+                {
+                    Console.WriteLine("Missing argument for --get");
+                    return;
+                }
 
-				getXpath = args[getIndex + 1];
-			}
+                getXpath = args[getIndex + 1];
+            }
 
-			var setIndex = Array.FindIndex(args, a => a.Equals("--set", StringComparison.CurrentCultureIgnoreCase));
-			var setXpath = "";
-			var setValue = "";
-			if (setIndex > -1)
-			{
-				if (args.Length < setIndex + 3 || string.IsNullOrEmpty(args[setIndex + 1]))
-				{
-					Console.WriteLine("Missing arguments for --set");
-					return;
-				}
+            var setIndex = Array.FindIndex(args, a => a.Equals("--set", StringComparison.CurrentCultureIgnoreCase));
+            var setXpath = "";
+            var setValue = "";
+            if (setIndex > -1)
+            {
+                if (args.Length < setIndex + 3 || string.IsNullOrEmpty(args[setIndex + 1]))
+                {
+                    Console.WriteLine("Missing arguments for --set");
+                    return;
+                }
 
-				setXpath = args[setIndex + 1];
-				setValue = args[setIndex + 2];
-			}
+                setXpath = args[setIndex + 1];
+                setValue = args[setIndex + 2];
+            }
 
-			var urlIndex = Array.FindIndex(args, a => a.Equals("--url", StringComparison.CurrentCultureIgnoreCase));
-			string url = "http://192.168.2.1";
-			if (urlIndex > -1)
-			{
-				if (args.Length < urlIndex + 2 || string.IsNullOrEmpty(args[urlIndex + 1]))
-				{
-					Console.WriteLine("Missing argument for --url");
-					return;
-				}
+            var urlIndex = Array.FindIndex(args, a => a.Equals("--url", StringComparison.CurrentCultureIgnoreCase));
+            string url = "http://192.168.2.1";
+            if (urlIndex > -1)
+            {
+                if (args.Length < urlIndex + 2 || string.IsNullOrEmpty(args[urlIndex + 1]))
+                {
+                    Console.WriteLine("Missing argument for --url");
+                    return;
+                }
 
-				url = args[urlIndex + 1];
-			}
+                url = args[urlIndex + 1];
+            }
 
-			var usernameIndex = Array.FindIndex(args, a => a.Equals("--username", StringComparison.CurrentCultureIgnoreCase));
-			string username = "admin";
-			if (usernameIndex > -1)
-			{
-				if (args.Length < usernameIndex + 2 || string.IsNullOrEmpty(args[usernameIndex + 1]))
-				{
-					Console.WriteLine("Missing argument for --username");
-					return;
-				}
+            var usernameIndex = Array.FindIndex(args, a => a.Equals("--username", StringComparison.CurrentCultureIgnoreCase));
+            string username = "admin";
+            if (usernameIndex > -1)
+            {
+                if (args.Length < usernameIndex + 2 || string.IsNullOrEmpty(args[usernameIndex + 1]))
+                {
+                    Console.WriteLine("Missing argument for --username");
+                    return;
+                }
 
-				username = args[usernameIndex + 1];
-			}
+                username = args[usernameIndex + 1];
+            }
 
-			var passwordIndex = Array.FindIndex(args, a => a.Equals("--password", StringComparison.CurrentCultureIgnoreCase));
-			string password = "admin";
-			if (passwordIndex > -1)
-			{
-				if (args.Length < passwordIndex + 2 || string.IsNullOrEmpty(args[passwordIndex + 1]))
-				{
-					password = "";
-				}
-				else
-				{
-					password = args[passwordIndex + 1];
-				}
-			}
+            var passwordIndex = Array.FindIndex(args, a => a.Equals("--password", StringComparison.CurrentCultureIgnoreCase));
+            string password = "admin";
+            if (passwordIndex > -1)
+            {
+                if (args.Length < passwordIndex + 2 || string.IsNullOrEmpty(args[passwordIndex + 1]))
+                {
+                    password = "";
+                }
+                else
+                {
+                    password = args[passwordIndex + 1];
+                }
+            }
 
-			OpenSession(url, username, password);
+            OpenSession(url, username, password);
 
-			if (!string.IsNullOrEmpty(getXpath))
-			{
-				var response = GetValue(getXpath);
-				Console.WriteLine(response.Replace(",}", "}"));
-			}
-            
-			if (!string.IsNullOrEmpty(setXpath))
-			{
-				var response = SetValue(setXpath, setValue);
-				Console.WriteLine(response.Replace(",}", "}"));
-			}
-		}
+            if (!string.IsNullOrEmpty(getXpath))
+            {
+                var response = GetValue(getXpath);
+                Console.WriteLine(response.Replace(",}", "}"));
+            }
 
-		private static string GetValue(string xpath, int depth = 999)
-		{
-			return SendActionsToBBox(new List<Dictionary<string, object>>
-			{
-				new Dictionary<string, object>
-				{
-					{"id", 1},
-					{"method", "getValue"},
-					{"xpath", xpath},
-					{
-						"options", new Dictionary<string, object>
-						{
-							{"depth", depth}
-						}
-					}
-				}
-			});
-		}
+            if (!string.IsNullOrEmpty(setXpath))
+            {
+                var response = SetValue(setXpath, setValue);
+                Console.WriteLine(response.Replace(",}", "}"));
+            }
 
-		private static string SetValue(string xpath, string value)
-		{
-			return SendActionsToBBox(new List<Dictionary<string, object>>
-			{
-				new Dictionary<string, object>
-				{
-					{"id", 1},
-					{"method", "setValue"},
-					{"xpath", xpath},
-					{
-						"parameters", new Dictionary<string, object>
-						{
-							{"value", value}
-						}
-					}
-				}
-			});
-		}
+            if (Array.FindIndex(args, a => a.Equals("--reboot", StringComparison.CurrentCultureIgnoreCase)) != -1)
+            {
+                var response = Reboot();
+                Console.WriteLine(response.Replace(",}", "}"));
+                return;
+            }
+        }
+
+        private static string GetValue(string xpath, int depth = 999)
+        {
+            return SendActionsToBBox(new List<Dictionary<string, object>>
+            {
+                new Dictionary<string, object>
+                {
+                    {"id", 1},
+                    {"method", "getValue"},
+                    {"xpath", xpath},
+                    {
+                        "options", new Dictionary<string, object>
+                        {
+                            {"depth", depth}
+                        }
+                    }
+                }
+            });
+        }
+
+        private static string SetValue(string xpath, string value)
+        {
+            return SendActionsToBBox(new List<Dictionary<string, object>>
+            {
+                new Dictionary<string, object>
+                {
+                    {"id", 1},
+                    {"method", "setValue"},
+                    {"xpath", xpath},
+                    {
+                        "parameters", new Dictionary<string, object>
+                        {
+                            {"value", value}
+                        }
+                    }
+                }
+            });
+        }     
+
+        private static string Reboot()
+        {
+            return SendActionsToBBox(new List<Dictionary<string, object>>
+            {
+                new Dictionary<string, object>
+                {
+                    {"id", _requestID},
+                    {"session-id", _sessionID.ToString()},
+                    {"priority", false},
+                    {"method", "reboot"},
+                    {"xpath", "Device"},
+                    {
+                        "parameters", new Dictionary<string, object>
+                        {
+                            {"source", "GUI"}
+                        }
+                    },
+                    {"cnonce", Convert.ToInt32(_localNonce)},
+                    {"auth-key", CalcAuthKey(_username, _password, _requestID, _serverNonce, _localNonce)}
+                }
+            });
+        }
+
 
         public static string GetLocalNonce()
         {
-            return ((uint) new Random(DateTime.Now.Millisecond).Next(Int32.MaxValue)).ToString();
+            return ((uint)new Random(DateTime.Now.Millisecond).Next(Int32.MaxValue)).ToString();
         }
 
         public static string Md5(string input)
@@ -202,7 +233,7 @@ Arguments:
 
         private static CookieCollection GetCookies()
         {
-            var cookies = new CookieCollection {new Cookie("lang", "en", "/", _cgiReq.Host)};
+            var cookies = new CookieCollection { new Cookie("lang", "en", "/", _cgiReq.Host) };
 
             //set language cookie
 
@@ -243,7 +274,7 @@ Arguments:
             return cookies;
         }
 
-        public static void OpenSession(string host, string username, string password)
+        public static string OpenSession(string host, string username, string password)
         {
             _username = username;
             _password = password;
@@ -332,7 +363,7 @@ Arguments:
 
             //prepare data to send
             var jsonString = JsonConvert.SerializeObject(jsonLogin);
-            var data = new Dictionary<string, string> {{"req", jsonString}};
+            var data = new Dictionary<string, string> { { "req", jsonString } };
 
             //send request & get response
             var response = SendRequest(_cgiReq, GetCookies(), data, "POST");
@@ -345,6 +376,8 @@ Arguments:
             _sessionID = Convert.ToInt32(parameters["id"]);
             _serverNonce = Convert.ToString(parameters["nonce"]);
             _requestID++;
+
+            return response;
         }
 
         public static string SendRequest(Uri url, CookieCollection cookies = null, Dictionary<string, string> data = null, string mode = "GET")
@@ -365,12 +398,12 @@ Arguments:
                     {
                         case "GET":
                             url = new Uri(url + "?" + dataStr);
-                            request = (HttpWebRequest) WebRequest.Create(url);
+                            request = (HttpWebRequest)WebRequest.Create(url);
                             request.Method = "GET";
                             request.Host = url.Host;
                             break;
                         case "POST":
-                            request = (HttpWebRequest) WebRequest.Create(url);
+                            request = (HttpWebRequest)WebRequest.Create(url);
                             request.Method = "POST";
                             request.Host = url.Host;
 
@@ -394,7 +427,7 @@ Arguments:
                     }
                 }
                 else
-                    request = (HttpWebRequest) WebRequest.Create(url);
+                    request = (HttpWebRequest)WebRequest.Create(url);
 
                 //set headers, fake real browser the best we can
                 request.KeepAlive = true;
@@ -453,7 +486,7 @@ Arguments:
 
             //prepare data to send
             var jsonString = JsonConvert.SerializeObject(jsonGetValue);
-            var data = new Dictionary<string, string> {{"req", jsonString}};
+            var data = new Dictionary<string, string> { { "req", jsonString } };
 
             //send request & get response
             var response = SendRequest(_cgiReq, GetCookies(), data, "POST");
