@@ -6,9 +6,13 @@ using System.Linq;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Tasks;
 using System.Web;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Org.BouncyCastle.Crypto;
+using Org.BouncyCastle.Crypto.Parameters;
+using Org.BouncyCastle.Security;
 
 // based on https://github.com/FransVDB/BBox3SagemTool
 
@@ -26,17 +30,12 @@ namespace homehubtool
 
         static void Main(string[] args)
         {
-            if (args.Contains("--help") || (!args.Contains("--set") && !args.Contains("--get") && !args.Contains("--reboot")))
+            if (args.Contains("--help")
+                || (!args.Contains("--set")
+                    && !args.Contains("--get")
+                    && !args.Contains("--reboot")
+                    && !args.Contains("--backup-config")))
             {
-                Console.WriteLine(@"
-Arguments:
---get [xpath]           Retrieve JSON dump of given xpath
---set [xpath] [value]   Set given xpath to given value
---url                   URL of router, default http://192.168.2.1
---username              Default admin
---password              Default admin
---help                  Show this help
-");
                 return;
             }
 
@@ -47,6 +46,7 @@ Arguments:
                 if (args.Length < getIndex + 2 || string.IsNullOrEmpty(args[getIndex + 1]))
                 {
                     Console.WriteLine("Missing argument for --get");
+                    Help();
                     return;
                 }
 
@@ -61,6 +61,7 @@ Arguments:
                 if (args.Length < setIndex + 3 || string.IsNullOrEmpty(args[setIndex + 1]))
                 {
                     Console.WriteLine("Missing arguments for --set");
+                    Help();
                     return;
                 }
 
@@ -75,6 +76,7 @@ Arguments:
                 if (args.Length < urlIndex + 2 || string.IsNullOrEmpty(args[urlIndex + 1]))
                 {
                     Console.WriteLine("Missing argument for --url");
+                    Help();
                     return;
                 }
 
@@ -88,6 +90,7 @@ Arguments:
                 if (args.Length < usernameIndex + 2 || string.IsNullOrEmpty(args[usernameIndex + 1]))
                 {
                     Console.WriteLine("Missing argument for --username");
+                    Help();
                     return;
                 }
 
@@ -108,26 +111,154 @@ Arguments:
                 }
             }
 
-            OpenSession(url, username, password);
-
-            if (!string.IsNullOrEmpty(getXpath))
+            var backupConfigIndex = Array.FindIndex(args, a => a.Equals("--backup-config", StringComparison.CurrentCultureIgnoreCase));
+            var backupConfigFile = "";
+            if (backupConfigIndex > -1)
             {
-                var response = GetValue(getXpath);
-                Console.WriteLine(response.Replace(",}", "}"));
+                if (args.Length < backupConfigIndex + 2 || string.IsNullOrEmpty(args[backupConfigIndex + 1]))
+                {
+                    Console.WriteLine("Missing argument for --backup-config");
+                    Help();
+                    return;
+                }
+
+                backupConfigFile = args[backupConfigIndex + 1];
             }
 
-            if (!string.IsNullOrEmpty(setXpath))
+            if (OpenSession(url, username, password))
             {
-                var response = SetValue(setXpath, setValue);
-                Console.WriteLine(response.Replace(",}", "}"));
-            }
+                /*
+                {
+                    var response = SendActionsToBBox(new List<Dictionary<string, object>>
+                    {
+                        new Dictionary<string, object>
+                        {
+                            { "method", "subscribeForNotification" },
+                            { "xpath", "Device/DNS/Diagnostics/NSLookupDiagnostics/DiagnosticsState" },
+                            { "parameters", new Dictionary<string, object> { { "id", "35" }, { "type", "value-change" }, { "current-value", false } } }
+                        }
+                    });
+                    Console.WriteLine(response.Replace(",}", "}"));
 
-            if (Array.FindIndex(args, a => a.Equals("--reboot", StringComparison.CurrentCultureIgnoreCase)) != -1)
-            {
-                var response = Reboot();
-                Console.WriteLine(response.Replace(",}", "}"));
-                return;
+                    response = SendActionsToBBox(new List<Dictionary<string, object>>
+                    {
+                        new Dictionary<string, object>
+                        {
+                            {"id", 0},
+                            {"method", "setValue"},
+                            {"xpath", "Device/DNS/Diagnostics/NSLookupDiagnostics/HostName"},
+                            {
+                                "parameters", new Dictionary<string, object>
+                                {
+                                    {"value", "$(whoami)"}
+                                }
+                            }
+                        },
+                        new Dictionary<string, object>
+                        {
+                            {"id", 1},
+                            {"method", "setValue"},
+                            {"xpath", "Device/DNS/Diagnostics/NSLookupDiagnostics/DiagnosticsState"},
+                            {
+                                "parameters", new Dictionary<string, object>
+                                {
+                                    {"value", "REQUESTED"}
+                                }
+                            }
+                        }
+                    });
+                    Console.WriteLine(response.Replace(",}", "}"));
+
+                    Task.Delay(5000).Wait();
+
+                    response = GetValue("Device/DNS/Diagnostics/NSLookupDiagnostics/Results/Result");
+                    Console.WriteLine(response.Replace(",}", "}"));
+                }
+                */
+
+                if (!string.IsNullOrEmpty(getXpath))
+                {
+                    var response = GetValue(getXpath);
+                    Console.WriteLine(response.Replace(",}", "}"));
+                }
+
+                if (!string.IsNullOrEmpty(setXpath))
+                {
+                    var response = SetValue(setXpath, setValue);
+                    Console.WriteLine(response.Replace(",}", "}"));
+                }
+
+                if (Array.FindIndex(args, a => a.Equals("--reboot", StringComparison.CurrentCultureIgnoreCase)) != -1)
+                {
+                    var response = Reboot();
+                    Console.WriteLine(response.Replace(",}", "}"));
+                }
+
+                if (!string.IsNullOrEmpty(backupConfigFile))
+				{
+					var jsonResponse = SendActionsToBBox(new List<Dictionary<string, object>>
+					{
+						new Dictionary<string, object>
+						{
+							{"id", 1},
+							{"method", "getVendorLogDownloadURI"},
+							{"xpath", "Device/DeviceInfo/VendorLogFiles/VendorLogFile[@uid='1']"},
+							{
+								"parameters", new Dictionary<string, object>
+								{
+									{"FileName", "config.cfg"}
+								}
+							}
+						}
+					});
+
+					var jsonObject = JsonConvert.DeserializeObject<JObject>(jsonResponse);
+					var downloadPath = (string) jsonObject["reply"]["actions"][0]["callbacks"][0]["parameters"]["uri"];
+
+					var request = (HttpWebRequest) WebRequest.Create(url + downloadPath);
+					request.Method = "GET";
+					using (var response = (HttpWebResponse) request.GetResponse())
+					using (var responseStream = response.GetResponseStream())
+                    /*
+                    using (var fs = new FileStream(backupConfigFile, FileMode.Create))
+                    {
+                        responseStream.CopyTo(fs);
+                        Console.WriteLine(Path.GetFullPath(backupConfigFile));
+                    }
+                    */
+                    using (var ms = new MemoryStream((int)response.ContentLength))
+                    {
+                        responseStream.CopyTo(ms);
+                        var input = ms.ToArray();
+                        var test = Encoding.UTF8.GetString(input);
+
+                        var key = Encoding.ASCII.GetBytes("\x7d\xa2\x58\x13\xdd\x9d\x7a\x15\x3e\x60\xa0\x28\xba\xdd\xb2\x88");
+                        var iv = input.Skip(16).Take(16).ToArray();
+                        var tag_len = BitConverter.ToInt32(input.Skip(12).Take(4).ToArray());
+                        var encrypted = input.Skip(48 + tag_len).ToArray();
+
+                        var cipher = CipherUtilities.GetCipher("AES/CTR/NoPadding");
+                        cipher.Init(false, new ParametersWithIV(ParameterUtilities.CreateKeyParameter("AES", key), iv));
+                        byte[] plainBytes = cipher.DoFinal(encrypted);
+                        Console.WriteLine("\n Decrypted:" + Encoding.ASCII.GetString(plainBytes));
+					}
+				}
             }
+        }
+
+        private static void Help()
+        {
+            Console.WriteLine(@"
+Arguments:
+--get [xpath]           Retrieve JSON dump of given xpath
+--set [xpath] [value]   Set given xpath to given value
+--url                   URL of router, default http://192.168.2.1
+--username              Default admin
+--password              Default admin
+--reboot                Reboots the router
+--backup-config [file]	Dump the config backup
+--help                  Show this help
+");
         }
 
         private static string GetValue(string xpath, int depth = 999)
@@ -190,7 +321,6 @@ Arguments:
                 }
             });
         }
-
 
         public static string GetLocalNonce()
         {
@@ -274,7 +404,7 @@ Arguments:
             return cookies;
         }
 
-        public static string OpenSession(string host, string username, string password)
+        public static bool OpenSession(string host, string username, string password)
         {
             _username = username;
             _password = password;
@@ -369,15 +499,24 @@ Arguments:
             var response = SendRequest(_cgiReq, GetCookies(), data, "POST");
 
             //deserialize object
-            var jsonObject = JsonConvert.DeserializeObject<JObject>(response);
-            var parameters = jsonObject["reply"]["actions"][0]["callbacks"][0]["parameters"];
+            try
+            {
+                var jsonObject = JsonConvert.DeserializeObject<JObject>(response);
+                var parameters = jsonObject["reply"]["actions"][0]["callbacks"][0]["parameters"];
 
-            //set session id and server nonce
-            _sessionID = Convert.ToInt32(parameters["id"]);
-            _serverNonce = Convert.ToString(parameters["nonce"]);
-            _requestID++;
+                //set session id and server nonce
+                _sessionID = Convert.ToInt32(parameters["id"]);
+                _serverNonce = Convert.ToString(parameters["nonce"]);
+                _requestID++;
 
-            return response;
+                return true;
+            }
+            catch
+            {
+                Console.WriteLine("Unexpected response to login:");
+                Console.WriteLine(response);
+                return false;
+            }
         }
 
         public static string SendRequest(Uri url, CookieCollection cookies = null, Dictionary<string, string> data = null, string mode = "GET")
